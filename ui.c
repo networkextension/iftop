@@ -114,9 +114,9 @@ static int get_bar_length(const long rate) {
     if (rate > scale[rateidx].max) {
       wantbiggerrate = 1;
       if(! rateidx_init) {
-	while(rate > scale[rateidx_init++].max) {
-	}
-	rateidx = rateidx_init;
+        while(rate > scale[rateidx_init++].max) {
+        }
+        rateidx = rateidx_init;
       }
     }
     if(options.log_scale) {

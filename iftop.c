@@ -73,7 +73,7 @@ int history_pos = 0;
 int history_len = 1;
 pthread_mutex_t tick_mutex;
 
-#define MAX_PD_COUNT  1
+#define MAX_PD_COUNT  5
 struct pdinfo_t {
 	pcap_t* pd; /* pcap descriptor */
 	struct bpf_program pcap_filter;
@@ -81,6 +81,7 @@ struct pdinfo_t {
 	pthread_t thread;
 };
 struct pdinfo_t pdinfos[MAX_PD_COUNT];
+int num_pdinfos = 0;
 
 sig_atomic_t foad;
 
@@ -709,11 +710,18 @@ void packet_init() {
     int dlt;
     int result;
 
-	struct pdinfo_t * const pdinfo = &pdinfos[0];
+    resolver_initialise();
+
+	for (char *interface = strtok(options.interface, ","); interface; interface = strtok(NULL, ",")) {
+		if (num_pdinfos >= MAX_PD_COUNT) {
+			fprintf(stderr, "limit %d interfaces\n", MAX_PD_COUNT); 
+			exit(1);
+		}
+		struct pdinfo_t * const pdinfo = &pdinfos[num_pdinfos++];
 #ifdef HAVE_DLPI
-    result = get_addrs_dlpi(options.interface, if_hw_addr, &if_ip_addr);
+    result = get_addrs_dlpi(interface, if_hw_addr, &if_ip_addr);
 #else
-    result = get_addrs_ioctl(options.interface, if_hw_addr,
+    result = get_addrs_ioctl(interface, if_hw_addr,
           &if_ip_addr, &if_ip6_addr);
 #endif
 
@@ -744,12 +752,11 @@ void packet_init() {
     }
     
     //    exit(0);
-    resolver_initialise();
 
-    pdinfo->pd = pcap_open_live(options.interface, CAPTURE_LENGTH, options.promiscuous, 1000, errbuf);
+    pdinfo->pd = pcap_open_live(interface, CAPTURE_LENGTH, options.promiscuous, 1000, errbuf);
     // DEBUG: pdinfo->pd = pcap_open_offline("tcpdump.out", errbuf);
     if(pdinfo->pd == NULL) { 
-        fprintf(stderr, "pcap_open_live(%s): %s\n", options.interface, errbuf); 
+        fprintf(stderr, "pcap_open_live(%s): %s\n", interface, errbuf); 
         exit(1);
     }
     dlt = pcap_datalink(pdinfo->pd);
@@ -803,6 +810,7 @@ void packet_init() {
         exit(1);
         return;
     }
+	}
 }
 
 /* packet_loop:
@@ -845,7 +853,9 @@ int main(int argc, char **argv) {
       ui_init();
     }
 
-    pthread_create(&pdinfos[0].thread, NULL, (void*)&packet_loop, &pdinfos[0]);
+	for (int i = 0; i < num_pdinfos; ++i) {
+		pthread_create(&pdinfos[i].thread, NULL, (void*)&packet_loop, &pdinfos[i]);
+	}
 
     /* Keep the starting time (used for timed termination) */
     first_timestamp = time(NULL);
@@ -864,9 +874,13 @@ int main(int argc, char **argv) {
       ui_loop();
     }
 
-    pthread_cancel(pdinfos[0].thread);
-    pthread_join(pdinfos[0].thread, NULL);
-    pcap_close(pdinfos[0].pd);
+	for (int i = 0; i < num_pdinfos; ++i) {
+		pthread_cancel(pdinfos[i].thread);
+	}
+	for (int i = 0; i < num_pdinfos; ++i) {
+		pthread_join(pdinfos[i].thread, NULL);
+		pcap_close(pdinfos[i].pd);
+	}
 
     ui_finish();
     

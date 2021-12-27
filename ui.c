@@ -44,8 +44,8 @@
 " S - toggle show source port            l - set screen filter\n"\
 " D - toggle show destination port       L - lin/log scales\n"\
 " p - toggle port display                ! - shell command\n"\
-"                                        q - quit\n"\
-"Sorting:\n"\
+"                                        r - reset scale\n"\
+"Sorting:                                q - quit\n"\
 " 1/2/3 - sort by 1st/2nd/3rd column\n"\
 " < - sort by source name\n"\
 " > - sort by dest name\n"\
@@ -782,6 +782,11 @@ void ui_loop() {
             case 'L':
                 options.log_scale = !options.log_scale;
                 showhelp(options.log_scale ? "Logarithmic scale" : "Linear scale");
+                ui_print();
+                break;
+            case 'r':
+                rateidx = 0;
+                rateidx_init = 0;
                 ui_print();
                 break;
             case KEY_CLEAR:

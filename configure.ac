@@ -434,6 +434,14 @@ if test x"$enable_default_promiscuous" = x"yes"; then
 	AC_DEFINE([NEED_PROMISCUOUS_FOR_OUTGOING],1,[Enable default promiscuous mode to capture outgoing packets])
 fi
 
+PKG_CHECK_MODULES([libnetfilter_conntrack], [libnetfilter_conntrack], [
+	PKG_CHECK_MODULES([libmnl], [libmnl], [
+		LIBS="$LIBS $libnetfilter_conntrack_LIBS $libmnl_LIBS"
+		CFLAGS="$CFLAGS $libnetfilter_conntrack_CFLAGS $libmnl_CFLAGS"
+		AC_DEFINE(HAVE_LIBNETFILTER_CONNTRACK, 1, [libnetfilter_conntrack available])
+	])
+])
+
 dnl
 dnl Wahey! This might even work.
 dnl

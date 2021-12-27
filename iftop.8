@@ -52,6 +52,9 @@ slow?
 \fB-h\fP
 Print a summary of usage.
 .TP
+\fB-C\fP
+Look for connections in conntrack table and use mapped IPs instead. 
+.TP
 \fB-n\fP
 Don't do hostname lookups. 
 .TP
@@ -211,6 +214,9 @@ sets the network interface.  The following config directives are supported:
 .TP
 \fBinterface:\fP \fIif\fP
 Sets the network interface to \fIif\fP.
+.TP
+\fBconntrack-resolution:\fP \fI(yes|no)\fP
+Controls lookup of connections in conntrack table.
 .TP
 \fBdns-resolution:\fP \fI(yes|no)\fP
 Controls reverse lookup of IP addresses.

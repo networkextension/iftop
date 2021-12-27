@@ -48,6 +48,7 @@ typedef struct {
     /* interface on which to listen */
     char *interface;
 
+    int conntrackresolution;
     int dnsresolution;
     int portresolution;
     /* pcap filter code */

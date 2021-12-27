@@ -30,7 +30,7 @@
 
 options_t options;
 
-char optstr[] = "+i:f:nNF:G:lhpbBu:Pm:c:s:tL:o:";
+char optstr[] = "+i:f:CnNF:G:lhpbBu:Pm:c:s:tL:o:";
 
 /* Global options. */
 
@@ -137,6 +137,7 @@ void options_set_defaults() {
     inet_pton(AF_INET6, "fe80::", &options.netfilter6net);	/* Link-local */
     inet_pton(AF_INET6, "ffff::", &options.netfilter6mask);
     options.link_local = 0;
+    options.conntrackresolution = 0;
     options.dnsresolution = 1;
     options.portresolution = 1;
 #ifdef NEED_PROMISCUOUS_FOR_OUTGOING
@@ -186,10 +187,11 @@ static void usage(FILE *fp) {
     fprintf(fp,
 "iftop: display bandwidth usage on an interface by host\n"
 "\n"
-"Synopsis: iftop -h | [-npblNBP] [-i interface] [-f filter code]\n"
+"Synopsis: iftop -h | [-CnpblNBP] [-i interface] [-f filter code]\n"
 "                               [-F net/mask] [-G net6/mask6]\n"
 "\n"
 "   -h                  display this message\n"
+"   -C                  look for connections in conntrack table\n"
 "   -n                  don't do hostname lookups\n"
 "   -N                  don't convert port numbers to services\n"
 "   -p                  run in promiscuous mode (show traffic between other\n"
@@ -233,6 +235,10 @@ void options_read_args(int argc, char **argv) {
             case 'h':
                 usage(stdout);
                 exit(0);
+
+            case 'C':
+                config_set_string("conntrack-resolution","true");
+                break;
 
             case 'n':
                 config_set_string("dns-resolution","false");
@@ -566,6 +572,7 @@ int options_config_get_net_filter6() {
 
 void options_make() {
     options_config_get_string("interface", &options.interface);
+    options_config_get_bool("conntrack-resolution", &options.conntrackresolution);
     options_config_get_bool("dns-resolution", &options.dnsresolution);
     options_config_get_bool("port-resolution", &options.portresolution);
     options_config_get_string("filter-code", &options.filtercode);

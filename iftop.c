@@ -86,6 +86,99 @@ static void finish(int sig) {
 
 
 
+#ifdef HAVE_LIBNETFILTER_CONNTRACK
+
+#include <arpa/inet.h>
+
+#include <libmnl/libmnl.h>
+#include <libnetfilter_conntrack/libnetfilter_conntrack.h>
+
+#include <linux/netfilter/nf_conntrack_tcp.h>
+
+struct mnl_socket *nlsock = NULL;
+
+static void conntrack_init() {
+	nlsock = mnl_socket_open(NETLINK_NETFILTER);
+	if (nlsock) {
+		if (mnl_socket_bind(nlsock, 0, MNL_SOCKET_AUTOPID) < 0) {
+			mnl_socket_close(nlsock);
+			nlsock = NULL;
+		}
+	}
+}
+
+static int conntrack_cb(const struct nlmsghdr *nlh, void *data) {
+	addr_pair* const ap = data;
+
+	struct nf_conntrack *ct = nfct_new();
+	if (!ct) {
+		return MNL_CB_OK;
+	}
+
+	nfct_nlmsg_parse(nlh, ct);
+
+	if (nfct_get_attr_u8(ct, ATTR_L3PROTO) == AF_INET) {
+		ap->src.s_addr = nfct_get_attr_u32(ct, ATTR_IPV4_SRC);
+		ap->dst.s_addr = nfct_get_attr_u32(ct, ATTR_IPV4_DST);
+		ap->protocol = nfct_get_attr_u8(ct, ATTR_L4PROTO);
+		ap->src_port = ntohs(nfct_get_attr_u16(ct, ATTR_PORT_SRC));
+		ap->dst_port = ntohs(nfct_get_attr_u16(ct, ATTR_PORT_DST));
+	}
+
+	nfct_destroy(ct);
+
+	return MNL_CB_OK;
+}
+
+void resolve_conntrack_mappings(addr_pair* const ap) {
+	if (!nlsock) return;
+
+	char buf[MNL_SOCKET_BUFFER_SIZE];
+	struct nlmsghdr *nlh = mnl_nlmsg_put_header(buf);
+	nlh->nlmsg_type = (NFNL_SUBSYS_CTNETLINK << 8) | IPCTNL_MSG_CT_GET;
+	nlh->nlmsg_flags = NLM_F_REQUEST|NLM_F_ACK;
+	nlh->nlmsg_seq = 0;
+
+	struct nfgenmsg *nfh = mnl_nlmsg_put_extra_header(nlh, sizeof(struct nfgenmsg));
+	nfh->nfgen_family = ap->af;
+	nfh->version = NFNETLINK_V0;
+	nfh->res_id = 0;
+
+	struct nf_conntrack *ct = nfct_new();
+	if (!ct) {
+		return;
+	}
+
+	nfct_set_attr_u8(ct, ATTR_L3PROTO, ap->af);
+	if (ap->af != AF_INET) {
+		// TODO: IPv6 support
+		return;
+	}
+	nfct_set_attr_u32(ct, ATTR_IPV4_SRC, ap->dst.s_addr);
+	nfct_set_attr_u32(ct, ATTR_IPV4_DST, ap->src.s_addr);
+	nfct_set_attr_u8(ct, ATTR_L4PROTO, ap->protocol);
+	nfct_set_attr_u16(ct, ATTR_PORT_SRC, htons(ap->dst_port));
+	nfct_set_attr_u16(ct, ATTR_PORT_DST, htons(ap->src_port));
+
+	nfct_nlmsg_build(nlh, ct);
+
+	int ret = mnl_socket_sendto(nlsock, nlh, nlh->nlmsg_len);
+	nfct_destroy(ct);
+	if (ret == -1) {
+		return;
+	}
+
+	ret = mnl_socket_recvfrom(nlsock, buf, sizeof(buf));
+	while (ret > 0) {
+		ret = mnl_cb_run(buf, ret, nlh->nlmsg_seq, mnl_socket_get_portid(nlsock), conntrack_cb, ap);
+		if (ret <= MNL_CB_STOP) {
+			break;
+		}
+		ret = mnl_socket_recvfrom(nlsock, buf, sizeof(buf));
+	}
+}
+#endif
+
 /* Only need ethernet (plus optional 4 byte VLAN) and IP headers (48) + first 2
  * bytes of tcp/udp header */
 /* Increase with a further 20 to account for IPv6 header length.  */
@@ -419,6 +512,9 @@ static void handle_ip_packet(struct ip* iptr, int hw_dir, int pld_len)
     switch (IP_V(iptr)) {
       case 4:
           ap.protocol = iptr->ip_p;
+#ifdef HAVE_LIBNETFILTER_CONNTRACK
+		  resolve_conntrack_mappings(&ap);
+#endif
           /* Add the addresses to be resolved */
           /* The IPv4 address is embedded in a in6_addr structure,
            * so it need be copied, and delivered to resolve(). */
@@ -827,6 +923,12 @@ int main(int argc, char **argv) {
     sigaction(SIGINT, &sa, NULL);
 
     pthread_mutex_init(&tick_mutex, NULL);
+
+#ifdef HAVE_LIBNETFILTER_CONNTRACK
+	if (options.conntrackresolution) {
+		conntrack_init();
+	}
+#endif
 
     packet_init();
 

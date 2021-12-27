@@ -23,6 +23,7 @@
 
 char * config_directives[] = {
 	"interface", 
+	"conntrack-resolution",
 	"dns-resolution",
 	"port-resolution",
 	"filter-code",

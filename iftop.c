@@ -73,9 +73,13 @@ int history_pos = 0;
 int history_len = 1;
 pthread_mutex_t tick_mutex;
 
-pcap_t* pd; /* pcap descriptor */
-struct bpf_program pcap_filter;
-pcap_handler packet_handler;
+#define MAX_PD_COUNT  1
+struct pdinfo_t {
+	pcap_t* pd; /* pcap descriptor */
+	struct bpf_program pcap_filter;
+	pcap_handler packet_handler;
+};
+struct pdinfo_t pdinfos[MAX_PD_COUNT];
 
 sig_atomic_t foad;
 
@@ -672,20 +676,20 @@ static void handle_radiotap_packet(unsigned char* args, const struct pcap_pkthdr
 /* set_filter_code:
  * Install some filter code. Returns NULL on success or an error message on
  * failure. */
-char *set_filter_code(const char *filter) {
+char *set_filter_code(struct pdinfo_t * const pdinfo, const char *filter) {
     char *x;
     if (filter) {
         x = xmalloc(strlen(filter) + sizeof "() and (ip or ip6)");
         sprintf(x, "(%s) and (ip or ip6)", filter);
     } else
         x = xstrdup("ip or ip6");
-    if (pcap_compile(pd, &pcap_filter, x, 1, 0) == -1) {
+    if (pcap_compile(pdinfo->pd, &pdinfo->pcap_filter, x, 1, 0) == -1) {
         xfree(x);
-        return pcap_geterr(pd);
+        return pcap_geterr(pdinfo->pd);
     }
     xfree(x);
-    if (pcap_setfilter(pd, &pcap_filter) == -1)
-        return pcap_geterr(pd);
+    if (pcap_setfilter(pdinfo->pd, &pdinfo->pcap_filter) == -1)
+        return pcap_geterr(pdinfo->pd);
     else
         return NULL;
 }
@@ -704,6 +708,7 @@ void packet_init() {
     int dlt;
     int result;
 
+	struct pdinfo_t * const pdinfo = &pdinfos[0];
 #ifdef HAVE_DLPI
     result = get_addrs_dlpi(options.interface, if_hw_addr, &if_ip_addr);
 #else
@@ -740,49 +745,49 @@ void packet_init() {
     //    exit(0);
     resolver_initialise();
 
-    pd = pcap_open_live(options.interface, CAPTURE_LENGTH, options.promiscuous, 1000, errbuf);
-    // DEBUG: pd = pcap_open_offline("tcpdump.out", errbuf);
-    if(pd == NULL) { 
+    pdinfo->pd = pcap_open_live(options.interface, CAPTURE_LENGTH, options.promiscuous, 1000, errbuf);
+    // DEBUG: pdinfo->pd = pcap_open_offline("tcpdump.out", errbuf);
+    if(pdinfo->pd == NULL) { 
         fprintf(stderr, "pcap_open_live(%s): %s\n", options.interface, errbuf); 
         exit(1);
     }
-    dlt = pcap_datalink(pd);
+    dlt = pcap_datalink(pdinfo->pd);
     if(dlt == DLT_EN10MB) {
-        packet_handler = handle_eth_packet;
+        pdinfo->packet_handler = handle_eth_packet;
     }
 #ifdef DLT_PFLOG
     else if (dlt == DLT_PFLOG) {
-		packet_handler = handle_pflog_packet;
+		pdinfo->packet_handler = handle_pflog_packet;
     }
 #endif
     else if(dlt == DLT_RAW) {
-        packet_handler = handle_raw_packet;
+        pdinfo->packet_handler = handle_raw_packet;
     } 
     else if(dlt == DLT_NULL) {
-        packet_handler = handle_null_packet;
+        pdinfo->packet_handler = handle_null_packet;
     } 
 #ifdef DLT_LOOP
     else if(dlt == DLT_LOOP) {
-        packet_handler = handle_null_packet;
+        pdinfo->packet_handler = handle_null_packet;
     }
 #endif
 #ifdef DLT_IEEE802_11_RADIO
     else if(dlt == DLT_IEEE802_11_RADIO) {
-        packet_handler = handle_radiotap_packet;
+        pdinfo->packet_handler = handle_radiotap_packet;
     }
 #endif
     else if(dlt == DLT_IEEE802) {
-        packet_handler = handle_tokenring_packet;
+        pdinfo->packet_handler = handle_tokenring_packet;
     }
     else if(dlt == DLT_PPP) {
-        packet_handler = handle_ppp_packet;
+        pdinfo->packet_handler = handle_ppp_packet;
     }
 /* 
  * SLL support not available in older libpcaps
  */
 #ifdef DLT_LINUX_SLL
     else if(dlt == DLT_LINUX_SLL) {
-      packet_handler = handle_cooked_packet;
+      pdinfo->packet_handler = handle_cooked_packet;
     }
 #endif
     else {
@@ -792,7 +797,7 @@ void packet_init() {
         exit(1);
     }
 
-    if ((m = set_filter_code(options.filtercode))) {
+    if ((m = set_filter_code(pdinfo, options.filtercode))) {
         fprintf(stderr, "set_filter_code: %s\n", m);
         exit(1);
         return;
@@ -802,7 +807,8 @@ void packet_init() {
 /* packet_loop:
  * Worker function for packet capture thread. */
 void packet_loop(void* ptr) {
-    pcap_loop(pd,-1,(pcap_handler)packet_handler,NULL);
+	struct pdinfo_t * const pdinfo = ptr;
+    pcap_loop(pdinfo->pd, -1, (pcap_handler)pdinfo->packet_handler, NULL);
 }
 
 
@@ -839,7 +845,7 @@ int main(int argc, char **argv) {
       ui_init();
     }
 
-    pthread_create(&thread, NULL, (void*)&packet_loop, NULL);
+    pthread_create(&thread, NULL, (void*)&packet_loop, &pdinfos[0]);
 
     /* Keep the starting time (used for timed termination) */
     first_timestamp = time(NULL);
@@ -860,7 +866,7 @@ int main(int argc, char **argv) {
 
     pthread_cancel(thread);
     pthread_join(thread, NULL);
-    pcap_close(pd);
+    pcap_close(pdinfos[0].pd);
 
     ui_finish();
     

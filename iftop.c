@@ -78,6 +78,7 @@ struct pdinfo_t {
 	pcap_t* pd; /* pcap descriptor */
 	struct bpf_program pcap_filter;
 	pcap_handler packet_handler;
+	pthread_t thread;
 };
 struct pdinfo_t pdinfos[MAX_PD_COUNT];
 
@@ -815,7 +816,6 @@ void packet_loop(void* ptr) {
 /* main:
  * Entry point. See usage(). */
 int main(int argc, char **argv) {
-    pthread_t thread;
     struct sigaction sa = {};
 
     setlocale(LC_ALL, "");
@@ -845,7 +845,7 @@ int main(int argc, char **argv) {
       ui_init();
     }
 
-    pthread_create(&thread, NULL, (void*)&packet_loop, &pdinfos[0]);
+    pthread_create(&pdinfos[0].thread, NULL, (void*)&packet_loop, &pdinfos[0]);
 
     /* Keep the starting time (used for timed termination) */
     first_timestamp = time(NULL);
@@ -864,8 +864,8 @@ int main(int argc, char **argv) {
       ui_loop();
     }
 
-    pthread_cancel(thread);
-    pthread_join(thread, NULL);
+    pthread_cancel(pdinfos[0].thread);
+    pthread_join(pdinfos[0].thread, NULL);
     pcap_close(pdinfos[0].pd);
 
     ui_finish();

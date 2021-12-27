@@ -444,6 +444,7 @@ static void handle_ip_packet(struct ip* iptr, int hw_dir, int pld_len)
           break;
     }
 
+	pthread_mutex_lock(&tick_mutex);
     if(hash_find(history, &ap, u_ht.void_pp) == HASH_STATUS_KEY_NOT_FOUND) {
         ht = history_create();
         hash_insert(history, &ap, ht);
@@ -459,6 +460,7 @@ static void handle_ip_packet(struct ip* iptr, int hw_dir, int pld_len)
 	  len = 1;
 	  break;
       default:
+		  pthread_mutex_unlock(&tick_mutex);
 	  return;
     }
 
@@ -485,6 +487,7 @@ static void handle_ip_packet(struct ip* iptr, int hw_dir, int pld_len)
         history_totals.total_sent += len;
     }
     
+	pthread_mutex_unlock(&tick_mutex);
 }
 
 static void handle_raw_packet(unsigned char* args, const struct pcap_pkthdr* pkthdr, const unsigned char* packet)

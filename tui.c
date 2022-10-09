@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <stdbool.h>
 #include <unistd.h>
 
 #if defined(HAVE_TERMIOS_H)
@@ -81,8 +82,10 @@ void tui_print() {
     host_pair_line* screen_line = (host_pair_line*)nn->data;
 
     /* Assemble host information */
-    sprint_host(host1, screen_line->ap.af, &(screen_line->ap.src6), screen_line->ap.src_port, screen_line->ap.protocol, PRINT_WIDTH, options.aggregate_src);
-    sprint_host(host2, screen_line->ap.af, &(screen_line->ap.dst6), screen_line->ap.dst_port, screen_line->ap.protocol, PRINT_WIDTH, options.aggregate_dest);
+    sprint_host(host1, screen_line->ap.af, &(screen_line->ap.src6), screen_line->ap.src_port,
+                screen_line->ap.protocol, PRINT_WIDTH, options.aggregate_src, true);
+    sprint_host(host2, screen_line->ap.af, &(screen_line->ap.dst6), screen_line->ap.dst_port,
+                screen_line->ap.protocol, PRINT_WIDTH, options.aggregate_dest, false);
 
     /* Send rate per connection */
     printf("%4d %s%s", l, host1, " =>");
@@ -169,6 +172,8 @@ void tui_init() {
   screen_hash = addr_hash_create();
   service_hash = serv_hash_create();
   serv_hash_initialise(service_hash);
+  process_hash = proc_hash_create();
+  proc_hash_init_refresh(process_hash, false);
 
   printf("Listening on %s\n", options.interface);
 }
@@ -233,6 +238,11 @@ void tui_loop() {
       case 'N':
         options.portresolution ^= 1;
         printf("Port resolution is %s.\n\n", options.portresolution ? "ON" : "OFF");
+        tick(1);
+        break;
+      case 'A':
+        options.process_names ^= 1;
+        printf("Process name display is %s.\n\n", options.process_names ? "ON" : "OFF");
         tick(1);
         break;
       case 's':
@@ -302,20 +312,20 @@ void tui_loop() {
         if (options.paused) {
           printf("Pausing... press 'P' again to continue.\n");
         }
-	else {
-	  printf("Continuing.\n\n");
-	  tick(1);
-	}
-	break;
+        else {
+          printf("Continuing.\n\n");
+          tick(1);
+        }
+        break;
       case 'o':
         options.freezeorder ^= 1;
         printf("Order %s.\n\n", options.freezeorder ? "frozen" : "unfrozen");
-	tick(1);
-	break;
+        tick(1);
+        break;
       case '1':
         options.sort = OPTION_SORT_DIV1;
         printf("Sorting by column 1.\n\n");
-	tick(1);
+      	tick(1);
         break;
       case '2':
         options.sort = OPTION_SORT_DIV2;

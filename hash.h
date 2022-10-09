@@ -24,6 +24,7 @@ typedef struct {
     int (*hash) (void*);
     void* (*copy_key) (void*);
     void (*delete_key) (void*);
+    void (*not_found_callback)(void*);
     hash_node_type** table;
     int size;
 } hash_type;

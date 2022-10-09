@@ -30,7 +30,7 @@
 
 options_t options;
 
-char optstr[] = "+i:f:nNF:G:lhpbBu:Pm:c:s:tL:o:";
+char optstr[] = "+i:f:nNF:G:lhpbBu:Pm:c:s:tL:o:A";
 
 /* Global options. */
 
@@ -165,6 +165,7 @@ void options_set_defaults() {
     options.timed_output = 0;
     options.no_curses = 0;
     options.num_lines = 10;
+    options.process_names = 0;
 
     /* Figure out the name for the config file */
     s = getenv("HOME");
@@ -204,6 +205,7 @@ static void usage(FILE *fp) {
 "   -G net6/mask6       show traffic flows in/out of IPv6 network\n"
 "   -l                  display and count link-local IPv6 traffic (default: off)\n"
 "   -P                  show ports as well as hosts\n"
+"   -A                  show local process names\n"
 "   -m limit            sets the upper limit for the bandwidth scale\n"
 "   -c config file      specifies an alternative configuration file\n"
 "   -t                  use text interface without ncurses\n"
@@ -282,9 +284,9 @@ void options_read_args(int argc, char **argv) {
                 config_set_string("bandwidth-unit", "bytes");
                 break;
 
-	    case 'u':
-		config_set_string("bandwidth-unit", optarg);
-		break;
+            case 'u':
+                config_set_string("bandwidth-unit", optarg);
+                break;
 
             case 's':
                 config_set_string("timed-output", optarg);
@@ -306,6 +308,10 @@ void options_read_args(int argc, char **argv) {
                 xfree(options.config_file);
                 options.config_file = xstrdup(optarg);
                 options.config_file_specified = 1;
+                break;
+
+            case 'A':
+                config_set_string("proc-names", "true");
                 break;
 
             case '?':
@@ -585,6 +591,7 @@ void options_make() {
     options_config_get_int("timed-output", &options.timed_output);
     options_config_get_bool("no-curses", &options.no_curses);
     options_config_get_int("num-lines", &options.num_lines);
+    options_config_get_bool("proc-names", &options.process_names);
     options_config_get_net_filter();
     options_config_get_net_filter6();
 };

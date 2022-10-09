@@ -11,6 +11,7 @@
 #include <stdio.h>
 
 #include "addr_hash.h"
+#include "proc_hash.h"
 #include "serv_hash.h"
 #include "iftop.h"
 #include "resolver.h"
@@ -33,16 +34,18 @@ typedef struct host_pair_line_tag {
 
 extern options_t options;
 
-sorted_list_type screen_list;
-host_pair_line totals;
-int peaksent, peakrecv, peaktotal;
+extern sorted_list_type screen_list;
+extern host_pair_line totals;
+extern int peaksent, peakrecv, peaktotal;
 extern history_type history_totals;
-hash_type* screen_hash;
-hash_type* service_hash;
+extern hash_type* screen_hash;
+extern hash_type* service_hash;
+extern hash_type* process_hash;
 
 void analyse_data(void);
 void screen_list_init(void);
-void sprint_host(char * line, int af, struct in6_addr* addr, unsigned int port, unsigned int protocol, int L, int unspecified_as_star);
+void sprint_host(char * line, int af, struct in6_addr* addr, unsigned int port,
+                unsigned int protocol, int L, int unspecified_as_star, bool is_local);
 void readable_size(float, char*, int, int, option_bw_unit_t);
 
 #endif /* __UI_COMMON_H_ */

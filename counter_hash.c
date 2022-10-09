@@ -50,6 +50,7 @@ hash_type* counter_hash_create() {
     hash_table->hash = &counter_hash_hash;
     hash_table->delete_key = &counter_hash_delete_key;
     hash_table->copy_key = &counter_hash_copy_key;
+    hash_table->not_found_callback = NULL;
     hash_initialise(hash_table);
     return hash_table;
 }

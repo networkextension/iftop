@@ -17,7 +17,7 @@ iftop_SOURCES = addr_hash.c edline.c hash.c iftop.c ns_hash.c \
                  options.c resolver.c screenfilter.c serv_hash.c \
                  sorted_list.c threadprof.c ui_common.c ui.c tui.c util.c \
 		 addrs_ioctl.c addrs_dlpi.c dlcommon.c \
-		 stringmap.c cfgfile.c vector.c
+		 stringmap.c cfgfile.c vector.c proc_hash.c
 
 #iftop_dump_SOURCES = counter_hash.c hash.c iftop-dump.c  \
 #                 options.c \

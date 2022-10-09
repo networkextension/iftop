@@ -44,6 +44,7 @@ hash_type* serv_hash_create() {
     hash_table->hash = &serv_hash_hash;
     hash_table->delete_key = &serv_hash_delete_key;
     hash_table->copy_key = &serv_hash_copy_key;
+    hash_table->not_found_callback = NULL;
     hash_initialise(hash_table);
     return hash_table;
 }

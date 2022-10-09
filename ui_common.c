@@ -27,6 +27,14 @@ char* unit_disp[][UNIT_DIVISIONS] = {
   [OPTION_BW_PKTS]  = { "p", "Kp", "Mp", "GB"},
 };
 
+sorted_list_type screen_list;
+host_pair_line totals;
+int peaksent, peakrecv, peaktotal;
+hash_type* screen_hash;
+hash_type* service_hash;
+hash_type* process_hash;
+
+
 extern hash_type* history;
 extern int history_pos;
 extern int history_len;
@@ -281,18 +289,6 @@ void analyse_data() {
         if(options.aggregate_dest) {
             memset(&ap.dst6, '\0', sizeof(ap.dst6));
         }
-
-        /* Aggregate ports, if required */
-        if(options.showports == OPTION_PORTS_DEST || options.showports == OPTION_PORTS_OFF) {
-            ap.src_port = 0;
-        }
-        if(options.showports == OPTION_PORTS_SRC || options.showports == OPTION_PORTS_OFF) {
-            ap.dst_port = 0;
-        }
-        if(options.showports == OPTION_PORTS_OFF) {
-            ap.protocol = 0;
-        }
-
 	
         if(hash_find(screen_hash, &ap, u_screen_line.void_pp) == HASH_STATUS_KEY_NOT_FOUND) {
             screen_line = xcalloc(1, sizeof *screen_line);
@@ -324,7 +320,8 @@ void analyse_data() {
 
 }
 
-void sprint_host(char * line, int af, struct in6_addr* addr, unsigned int port, unsigned int protocol, int L, int unspecified_as_star) {
+void sprint_host(char * line, int af, struct in6_addr* addr, unsigned int port,
+                 unsigned int protocol, int L, int unspecified_as_star, bool is_local) {
     char hostname[HOSTNAME_LENGTH];
     char service[HOSTNAME_LENGTH];
     char* s_name;
@@ -334,6 +331,7 @@ void sprint_host(char * line, int af, struct in6_addr* addr, unsigned int port, 
     } u_s_name = { &s_name };
 
     ip_service skey;
+    ip_process pkey;
     int left;
 
     if(IN6_IS_ADDR_UNSPECIFIED(addr) && unspecified_as_star) {
@@ -346,21 +344,23 @@ void sprint_host(char * line, int af, struct in6_addr* addr, unsigned int port, 
             inet_ntop(af, addr, hostname, sizeof(hostname));
     }
     left = strlen(hostname);
-
-    if(port != 0) {
+    service[0] = '\0';
+    if ((options.showports == OPTION_PORTS_ON) || (options.showports == OPTION_PORTS_SRC && is_local) ||
+                                                  (options.showports == OPTION_PORTS_DEST && !is_local)) {
       skey.port = port;
       skey.protocol = protocol;
       if(options.portresolution && hash_find(service_hash, &skey, u_s_name.void_pp) == HASH_STATUS_OK) {
         snprintf(service, HOSTNAME_LENGTH, ":%s", s_name);
-      }
-      else {
+      } else {
         snprintf(service, HOSTNAME_LENGTH, ":%d", port);
       }
     }
-    else {
-      service[0] = '\0';
+    pkey.port = (uint16_t)port;
+    if (options.process_names && is_local && 
+          hash_find(process_hash, &pkey, (void **) &(pkey.name)) == HASH_STATUS_OK) {
+      snprintf(service + strlen(service), HOSTNAME_LENGTH - strlen(service), "(%s)", pkey.name);
     }
-    
+
     /* If we're showing IPv6 addresses with a port number, put them in square
      * brackets. */
     if(port == 0 || af == AF_INET || L < 2) {

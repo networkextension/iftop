@@ -97,6 +97,8 @@ typedef struct {
     char *config_file;
     int config_file_specified;
 
+    int process_names;
+
 } options_t;
 
 

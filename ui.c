@@ -44,7 +44,8 @@
 " S - toggle show source port            l - set screen filter\n"\
 " D - toggle show destination port       L - lin/log scales\n"\
 " p - toggle port display                ! - shell command\n"\
-"                                        q - quit\n"\
+" A - toggle show process names          q - quit\n"\
+"\n"\
 "Sorting:\n"\
 " 1/2/3 - sort by 1st/2nd/3rd column\n"\
 " < - sort by source name\n"\
@@ -315,11 +316,13 @@ void ui_print() {
                 sprint_host(host1, screen_line->ap.af,
                             &(screen_line->ap.src6),
                             screen_line->ap.src_port,
-                            screen_line->ap.protocol, L, options.aggregate_src);
+                            screen_line->ap.protocol, L,
+                            options.aggregate_src, true);
                 sprint_host(host2, screen_line->ap.af,
                             &(screen_line->ap.dst6),
                             screen_line->ap.dst_port,
-                            screen_line->ap.protocol, L, options.aggregate_dest);
+                            screen_line->ap.protocol, L,
+                            options.aggregate_dest, false);
 
                 if(!screen_filter_match(host1) && !screen_filter_match(host2)) {
                   continue;
@@ -467,6 +470,9 @@ void ui_init() {
     service_hash = serv_hash_create();
     serv_hash_initialise(service_hash);
 
+    process_hash = proc_hash_create();
+    proc_hash_init_refresh(process_hash, false);
+
     snprintf(msg,20,"Listening on %s",options.interface);
     showhelp(msg);
 
@@ -526,6 +532,17 @@ void ui_loop() {
                 else {
                     options.portresolution = 1;
                     showhelp("Port resolution on");
+                }
+                tick(1);
+                break;
+
+            case 'A':
+                if (options.process_names) {
+                    options.process_names = 0;
+                    showhelp("Process names off");
+                } else {
+                    options.process_names = 1;
+                    showhelp("Process names on");
                 }
                 tick(1);
                 break;

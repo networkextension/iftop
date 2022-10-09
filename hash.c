@@ -69,7 +69,12 @@ hash_status_enum hash_find(hash_type* hash_table, void* key, void **rec) {
     while (p && !hash_table->compare(p->key, key))  {
         p = p->next;
     }
-    if (!p) return HASH_STATUS_KEY_NOT_FOUND;
+    if (!p) {
+        if (hash_table->not_found_callback != NULL) {
+            hash_table->not_found_callback((void *)hash_table);
+        }
+        return HASH_STATUS_KEY_NOT_FOUND;
+    }
     *rec = p->rec;
     return HASH_STATUS_OK;
 }
